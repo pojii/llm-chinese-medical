@@ -2,12 +2,22 @@
 LLM-based medicine prediction system.
 Uses lightweight models for CPU inference.
 """
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 from typing import Optional
 import warnings
 
 warnings.filterwarnings('ignore')
+
+# Try to import torch and transformers, use mock if not available
+try:
+    import torch
+    from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+    torch = None
+    AutoTokenizer = None
+    AutoModelForCausalLM = None
+    pipeline = None
 
 
 class MedicineLLMPredictor:
@@ -36,6 +46,12 @@ class MedicineLLMPredictor:
 
         print(f"Loading model: {model_name}...")
         print(f"Device: {device}")
+
+        if not HAS_TORCH:
+            print("Torch not available. Using mock predictor for demonstration...")
+            self.model = None
+            self.tokenizer = None
+            return
 
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(

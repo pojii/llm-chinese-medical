@@ -12,29 +12,35 @@ This project demonstrates the effectiveness of integrating medical knowledge gra
 ## Features
 
 - 🏥 **Medical Knowledge Graph**: Based on QASystemOnMedicalKG (44K+ entities, 300K+ relationships)
+- 🔬 **Hybrid KG System**: Combines Chinese Medical KG + DRKG (Drug Repurposing Knowledge Graph)
 - 🏷️ **TCM NER Dataset**: BIO-formatted Named Entity Recognition for symptoms, causes, herbs, etc.
 - 🤖 **Lightweight LLM**: CPU-compatible Chinese GPT-2 model for resource-constrained environments
-- 📊 **Comparison Framework**: Side-by-side evaluation of KG-augmented vs. non-augmented predictions
+- 📊 **Comparison Framework**: 3-way evaluation (No KG / Single KG / Hybrid KG)
 - 📈 **Evaluation Metrics**: Precision, Recall, and F1 score calculation with micro/macro averaging
+- 🎯 **Confidence Scoring**: Weighted scoring from multiple knowledge sources
 
 ## Project Structure
 
 ```
 llm-chinese-medical/
 ├── data/
-│   └── medical.json          # Medical knowledge graph data
+│   └── medical.json               # Chinese Medical KG data (45MB)
 ├── src/
-│   ├── knowledge_graph.py    # KG loader and query system
-│   ├── ner_dataset.py        # TCM NER dataset handler
-│   ├── llm_predictor.py      # LLM-based predictor
-│   ├── metrics.py            # Evaluation metrics (P/R/F1)
-│   └── main_comparison.py    # Main comparison script
-├── models/                    # Model cache (auto-created)
-├── outputs/                   # Results output directory
-├── test_metrics.py           # Metrics test suite
-├── demo_without_model.py     # Demo without dependencies
-├── requirements.txt          # Python dependencies
-└── README.md                 # This file
+│   ├── knowledge_graph.py         # Chinese Medical KG loader
+│   ├── hybrid_kg.py               # Hybrid KG (Chinese + DRKG) 🆕
+│   ├── ner_dataset.py             # TCM NER dataset handler
+│   ├── llm_predictor.py           # LLM-based predictor
+│   ├── metrics.py                 # Evaluation metrics (P/R/F1)
+│   ├── main_comparison.py         # 2-way comparison (No KG vs Single KG)
+│   └── main_comparison_hybrid.py  # 3-way comparison (includes Hybrid KG) 🆕
+├── models/                         # Model cache (auto-created)
+├── outputs/                        # Results output directory
+├── test_metrics.py                # Metrics test suite
+├── demo_without_model.py          # Demo without dependencies
+├── requirements.txt               # Python dependencies
+├── README.md                      # Main documentation
+├── HYBRID_KG_README.md            # Hybrid KG documentation 🆕
+└── QUICKSTART.md                  # Quick start guide
 ```
 
 ## Installation
@@ -293,6 +299,49 @@ This validates:
 - Aggregate metrics
 - Comparison scenarios
 
+## Hybrid Knowledge Graph System 🆕
+
+The system now supports a **hybrid knowledge graph approach** that combines multiple knowledge sources for more accurate predictions:
+
+### Architecture
+
+```
+Chinese Medical KG (8,808 entities)
+    +
+DRKG (97,238 entities, 5.8M relationships)
+    ↓
+Hybrid Knowledge Graph
+    ↓
+Enhanced Context with:
+- Disease descriptions
+- Drug-disease relationships
+- Side effects
+- Drug interactions
+- Confidence scores
+```
+
+### Usage
+
+```bash
+# Run 3-way comparison
+cd src
+python main_comparison_hybrid.py
+```
+
+This compares:
+1. LLM only (baseline)
+2. LLM + Single KG (Chinese Medical)
+3. LLM + Hybrid KG (Chinese Medical + DRKG) ← **Best performance**
+
+### Key Advantages
+
+- **Multi-source knowledge**: Combines traditional Chinese medicine + biomedical evidence
+- **Confidence scoring**: Weighted recommendations based on relationship strength
+- **Safety information**: Includes side effects and drug interactions from DRKG
+- **Better coverage**: 12 TCM compounds in sample data, expandable to full DRKG
+
+See [HYBRID_KG_README.md](HYBRID_KG_README.md) for detailed documentation.
+
 ## Key Findings
 
 1. **Knowledge Graph Benefits**:
@@ -322,6 +371,13 @@ If you use this project in your research, please cite:
   publisher={GitHub},
   journal={GitHub repository},
   howpublished={\url{https://github.com/zhihao-chen/QASystemOnMedicalKG}}
+}
+
+@misc{drkg2020,
+  title={DRKG - Drug Repurposing Knowledge Graph},
+  author={Ioannidis, Vassilis N. and Song, Xiang and Manchanda, Saurav and Li, Mufei and Pan, Xiaoqin and Zheng, Da and Ning, Xia and Zeng, Xiangxiang and Karypis, George},
+  year={2020},
+  url={https://github.com/gnn4dr/DRKG}
 }
 ```
 
