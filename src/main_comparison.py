@@ -9,6 +9,7 @@ import json
 from knowledge_graph import MedicalKnowledgeGraph
 from ner_dataset import TCMNERDataset
 from llm_predictor import MedicineLLMPredictor
+from metrics import MedicineEvaluationMetrics
 
 
 class MedicinePredictionComparison:
@@ -76,6 +77,10 @@ class MedicinePredictionComparison:
 
         results = []
 
+        # Initialize metrics trackers
+        metrics_without_kg = MedicineEvaluationMetrics()
+        metrics_with_kg = MedicineEvaluationMetrics()
+
         for i in range(num_samples):
             print(f"\n{'=' * 80}")
             print(f"Sample {i + 1}/{num_samples}")
@@ -120,6 +125,36 @@ class MedicinePredictionComparison:
             print(f"\n预测结果: {pred_with_kg}")
             print(f"推理时间: {time_with_kg:.2f}秒")
 
+            # Extract medicines from predictions
+            pred_without_kg_set = MedicineEvaluationMetrics.extract_medicines_from_text(pred_without_kg)
+            pred_with_kg_set = MedicineEvaluationMetrics.extract_medicines_from_text(pred_with_kg)
+            ground_truth_set = set(ground_truth_herbs) if ground_truth_herbs else set()
+
+            # Calculate metrics for this sample
+            sample_metrics_without_kg = metrics_without_kg.calculate_metrics(pred_without_kg_set, ground_truth_set)
+            sample_metrics_with_kg = metrics_with_kg.calculate_metrics(pred_with_kg_set, ground_truth_set)
+
+            # Update aggregate metrics
+            metrics_without_kg.update(pred_without_kg_set, ground_truth_set)
+            metrics_with_kg.update(pred_with_kg_set, ground_truth_set)
+
+            # Print metrics for this sample
+            print(f"\n{'─' * 80}")
+            print("📊 本样本评估指标")
+            print('─' * 80)
+
+            print("\n不使用知识图谱:")
+            print(f"  提取的药物: {pred_without_kg_set if pred_without_kg_set else '无'}")
+            print(f"  Precision: {sample_metrics_without_kg['precision']:.4f}")
+            print(f"  Recall:    {sample_metrics_without_kg['recall']:.4f}")
+            print(f"  F1 Score:  {sample_metrics_without_kg['f1']:.4f}")
+
+            print("\n使用知识图谱:")
+            print(f"  提取的药物: {pred_with_kg_set if pred_with_kg_set else '无'}")
+            print(f"  Precision: {sample_metrics_with_kg['precision']:.4f}")
+            print(f"  Recall:    {sample_metrics_with_kg['recall']:.4f}")
+            print(f"  F1 Score:  {sample_metrics_with_kg['f1']:.4f}")
+
             # Store results
             result = {
                 'sample_id': i,
@@ -130,9 +165,17 @@ class MedicinePredictionComparison:
                 'prediction_with_kg': pred_with_kg,
                 'time_without_kg': time_without_kg,
                 'time_with_kg': time_with_kg,
-                'kg_context_used': kg_context[:200]
+                'kg_context_used': kg_context[:200],
+                'metrics_without_kg': sample_metrics_without_kg,
+                'metrics_with_kg': sample_metrics_with_kg
             }
             results.append(result)
+
+        # Store aggregate metrics in results
+        results.append({
+            'aggregate_metrics_without_kg': metrics_without_kg.get_aggregate_metrics(),
+            'aggregate_metrics_with_kg': metrics_with_kg.get_aggregate_metrics()
+        })
 
         return results
 
@@ -147,20 +190,77 @@ class MedicinePredictionComparison:
         print("比较结果汇总")
         print("=" * 80)
 
-        total_samples = len(results)
-        avg_time_without_kg = sum(r['time_without_kg'] for r in results) / total_samples
-        avg_time_with_kg = sum(r['time_with_kg'] for r in results) / total_samples
+        # Extract aggregate metrics (last item in results)
+        aggregate = results[-1]
+        sample_results = results[:-1]
+
+        total_samples = len(sample_results)
+        avg_time_without_kg = sum(r['time_without_kg'] for r in sample_results) / total_samples
+        avg_time_with_kg = sum(r['time_with_kg'] for r in sample_results) / total_samples
 
         print(f"\n测试样本数: {total_samples}")
         print(f"\n平均推理时间:")
         print(f"  - 不使用KG: {avg_time_without_kg:.2f}秒")
         print(f"  - 使用KG:   {avg_time_with_kg:.2f}秒")
 
+        # Print aggregate metrics
+        print("\n\n" + "=" * 80)
+        print("📊 聚合评估指标 (Aggregate Metrics)")
+        print("=" * 80)
+
+        metrics_no_kg = aggregate['aggregate_metrics_without_kg']
+        metrics_kg = aggregate['aggregate_metrics_with_kg']
+
+        print("\n【方法1】不使用知识图谱")
+        print("─" * 80)
+        print(f"Micro-averaged:")
+        print(f"  Precision: {metrics_no_kg['micro_precision']:.4f}")
+        print(f"  Recall:    {metrics_no_kg['micro_recall']:.4f}")
+        print(f"  F1 Score:  {metrics_no_kg['micro_f1']:.4f}")
+        print(f"\nMacro-averaged:")
+        print(f"  Precision: {metrics_no_kg['macro_precision']:.4f}")
+        print(f"  Recall:    {metrics_no_kg['macro_recall']:.4f}")
+        print(f"  F1 Score:  {metrics_no_kg['macro_f1']:.4f}")
+        print(f"\nConfusion Matrix:")
+        print(f"  True Positives:  {metrics_no_kg['total_tp']}")
+        print(f"  False Positives: {metrics_no_kg['total_fp']}")
+        print(f"  False Negatives: {metrics_no_kg['total_fn']}")
+
+        print("\n【方法2】使用知识图谱增强")
+        print("─" * 80)
+        print(f"Micro-averaged:")
+        print(f"  Precision: {metrics_kg['micro_precision']:.4f}")
+        print(f"  Recall:    {metrics_kg['micro_recall']:.4f}")
+        print(f"  F1 Score:  {metrics_kg['micro_f1']:.4f}")
+        print(f"\nMacro-averaged:")
+        print(f"  Precision: {metrics_kg['macro_precision']:.4f}")
+        print(f"  Recall:    {metrics_kg['macro_recall']:.4f}")
+        print(f"  F1 Score:  {metrics_kg['macro_f1']:.4f}")
+        print(f"\nConfusion Matrix:")
+        print(f"  True Positives:  {metrics_kg['total_tp']}")
+        print(f"  False Positives: {metrics_kg['total_fp']}")
+        print(f"  False Negatives: {metrics_kg['total_fn']}")
+
+        # Compare improvements
+        print("\n" + "=" * 80)
+        print("🎯 性能对比 (Performance Comparison)")
+        print("=" * 80)
+
+        f1_improvement = (metrics_kg['micro_f1'] - metrics_no_kg['micro_f1']) / metrics_no_kg['micro_f1'] * 100 if metrics_no_kg['micro_f1'] > 0 else 0
+        precision_improvement = (metrics_kg['micro_precision'] - metrics_no_kg['micro_precision']) / metrics_no_kg['micro_precision'] * 100 if metrics_no_kg['micro_precision'] > 0 else 0
+        recall_improvement = (metrics_kg['micro_recall'] - metrics_no_kg['micro_recall']) / metrics_no_kg['micro_recall'] * 100 if metrics_no_kg['micro_recall'] > 0 else 0
+
+        print(f"\n知识图谱增强带来的提升:")
+        print(f"  F1 Score:  {f1_improvement:+.2f}%")
+        print(f"  Precision: {precision_improvement:+.2f}%")
+        print(f"  Recall:    {recall_improvement:+.2f}%")
+
         print(f"\n{'=' * 80}")
         print("结论")
         print('=' * 80)
-        print("""
+        print(f"""
 1. **知识图谱增强的优势**:
+   - F1分数提升: {f1_improvement:+.2f}%
    - 提供领域专业知识作为上下文
    - 增强LLM对医学术语的理解
    - 提高推荐的准确性和可解释性

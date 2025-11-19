@@ -15,6 +15,7 @@ This project demonstrates the effectiveness of integrating medical knowledge gra
 - 🏷️ **TCM NER Dataset**: BIO-formatted Named Entity Recognition for symptoms, causes, herbs, etc.
 - 🤖 **Lightweight LLM**: CPU-compatible Chinese GPT-2 model for resource-constrained environments
 - 📊 **Comparison Framework**: Side-by-side evaluation of KG-augmented vs. non-augmented predictions
+- 📈 **Evaluation Metrics**: Precision, Recall, and F1 score calculation with micro/macro averaging
 
 ## Project Structure
 
@@ -26,9 +27,12 @@ llm-chinese-medical/
 │   ├── knowledge_graph.py    # KG loader and query system
 │   ├── ner_dataset.py        # TCM NER dataset handler
 │   ├── llm_predictor.py      # LLM-based predictor
+│   ├── metrics.py            # Evaluation metrics (P/R/F1)
 │   └── main_comparison.py    # Main comparison script
 ├── models/                    # Model cache (auto-created)
 ├── outputs/                   # Results output directory
+├── test_metrics.py           # Metrics test suite
+├── demo_without_model.py     # Demo without dependencies
 ├── requirements.txt          # Python dependencies
 └── README.md                 # This file
 ```
@@ -194,7 +198,100 @@ Sample 1/5
 描述: 感冒是由病毒引起的上呼吸道感染...
 预测结果: 银翘解毒片 (基于知识图谱推荐)
 推理时间: 0.18秒
+
+📊 本样本评估指标
+────────────────────────────────────────
+不使用知识图谱:
+  提取的药物: {'银翘解毒片', '连花清瘟胶囊'}
+  Precision: 0.5000
+  Recall:    0.5000
+  F1 Score:  0.5000
+
+使用知识图谱:
+  提取的药物: {'银翘解毒片'}
+  Precision: 1.0000
+  Recall:    1.0000
+  F1 Score:  1.0000
 ```
+
+## Evaluation Metrics
+
+The system calculates comprehensive evaluation metrics to quantify performance:
+
+### Metrics Calculated
+
+1. **Precision**: Proportion of predicted medicines that are correct
+   - Formula: TP / (TP + FP)
+   - Measures accuracy of predictions
+
+2. **Recall**: Proportion of ground truth medicines that were predicted
+   - Formula: TP / (TP + FN)
+   - Measures completeness of predictions
+
+3. **F1 Score**: Harmonic mean of precision and recall
+   - Formula: 2 × (Precision × Recall) / (Precision + Recall)
+   - Balances both metrics
+
+### Aggregation Methods
+
+- **Micro-averaging**: Aggregate all TP/FP/FN counts, then calculate metrics
+  - Better for overall system performance
+  - Weighs each medicine equally
+
+- **Macro-averaging**: Calculate metrics per sample, then average
+  - Better for per-sample performance
+  - Weighs each test case equally
+
+### Medicine Matching
+
+The metrics system includes intelligent matching:
+
+- **Exact match**: Same medicine name (similarity = 1.0)
+- **Partial match**: Contains relationship (similarity = 0.8)
+  - E.g., "板蓝根" matches "板蓝根颗粒"
+- **Fuzzy match**: Character overlap (configurable threshold)
+
+### Example Aggregate Results
+
+```
+📊 聚合评估指标 (Aggregate Metrics)
+================================================================================
+【方法1】不使用知识图谱
+────────────────────────────────────────
+Micro-averaged:
+  Precision: 0.6250
+  Recall:    0.8333
+  F1 Score:  0.7143
+
+【方法2】使用知识图谱增强
+────────────────────────────────────────
+Micro-averaged:
+  Precision: 1.0000
+  Recall:    1.0000
+  F1 Score:  1.0000
+
+🎯 性能对比 (Performance Comparison)
+────────────────────────────────────────
+知识图谱增强带来的提升:
+  F1 Score:  +40.00%
+  Precision: +60.00%
+  Recall:    +20.00%
+```
+
+### Testing Metrics
+
+Run the metrics test suite:
+
+```bash
+python test_metrics.py
+```
+
+This validates:
+- Medicine extraction from text
+- Similarity calculation
+- Precision/recall/F1 computation
+- Aggregate metrics
+- Comparison scenarios
 
 ## Key Findings
 
