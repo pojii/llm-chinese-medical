@@ -9,7 +9,7 @@ from collections import defaultdict
 class MedicalKnowledgeGraph:
     """Medical Knowledge Graph for storing and querying medical entities."""
 
-    def __init__(self, data_path: str = "./data/medical.json"):
+    def __init__(self, data_path: str = "../data/medical.json"):
         """
         Initialize the knowledge graph from medical.json
 

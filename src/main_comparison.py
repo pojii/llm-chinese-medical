@@ -18,7 +18,7 @@ class MedicinePredictionComparison:
 
     def __init__(
         self,
-        kg_path: str = "./data/medical.json",
+        kg_path: str = "../data/medical.json",
         ner_path: str = None,
         model_name: str = "uer/gpt2-chinese-cluecorpussmall",
         device: str = "cpu"
@@ -204,7 +204,7 @@ def main():
 
     # Configuration
     config = {
-        'kg_path': './data/medical.json',
+        'kg_path': '../data/medical.json',
         'ner_path': None,  # Use sample data
         'model_name': 'uer/gpt2-chinese-cluecorpussmall',
         'device': 'cpu',
