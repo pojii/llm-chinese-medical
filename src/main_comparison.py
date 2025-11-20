@@ -8,7 +8,7 @@ import json
 
 from knowledge_graph import MedicalKnowledgeGraph
 from ner_dataset import TCMNERDataset
-from deepseek_predictor import DeepSeekMedicinePredictor
+from deepseek_api_predictor import DeepSeekAPIPredictor
 from llm_predictor import MedicineLLMPredictor
 from metrics import MedicineEvaluationMetrics
 
@@ -22,8 +22,8 @@ class MedicinePredictionComparison:
         self,
         kg_path: str = "../data/medical.json",
         ner_path: str = None,
-        model_name: str = "uer/gpt2-chinese-cluecorpussmall",
-        device: str = "cpu"
+        use_api: bool = True,
+        model_name: str = "deepseek-chat"
     ):
         """
         Initialize comparison system.
@@ -31,8 +31,8 @@ class MedicinePredictionComparison:
         Args:
             kg_path: Path to knowledge graph data
             ner_path: Path to NER dataset (None for sample data)
-            model_name: LLM model name
-            device: Device to run on
+            use_api: Use DeepSeek API instead of local model (default: True)
+            model_name: Model name for API (default: "deepseek-chat")
         """
         print("=" * 80)
         print("Initializing Medicine Prediction Comparison System")
@@ -49,13 +49,14 @@ class MedicinePredictionComparison:
 
         # Initialize LLM Predictor
         print("\n[3/3] Initializing LLM Predictor...")
-        # Use DeepSeek predictor if DeepSeek model is specified
-        if "deepseek" in model_name.lower():
-            self.predictor = DeepSeekMedicinePredictor(device=device)
+        if use_api:
+            # Use DeepSeek API
+            self.predictor = DeepSeekAPIPredictor(model=model_name)
         else:
+            # Use local model (legacy)
             self.predictor = MedicineLLMPredictor(
                 model_name=model_name,
-                device=device
+                device="cpu"
             )
 
         print("\n" + "=" * 80)
@@ -311,8 +312,8 @@ def main():
     config = {
         'kg_path': '../data/medical.json',
         'ner_path': None,  # Use sample data
-        'model_name': 'deepseek-ai/DeepSeek-R1-Distill-Llama-8B',
-        'device': 'cuda',  # Use GPU for better performance
+        'use_api': True,  # Use DeepSeek API (set to False for local model)
+        'model_name': 'deepseek-chat',  # Model name for API
         'num_samples': 5  # Test on 5 samples
     }
 
@@ -321,8 +322,8 @@ def main():
         comparison = MedicinePredictionComparison(
             kg_path=config['kg_path'],
             ner_path=config['ner_path'],
-            model_name=config['model_name'],
-            device=config['device']
+            use_api=config['use_api'],
+            model_name=config['model_name']
         )
 
         # Run comparison

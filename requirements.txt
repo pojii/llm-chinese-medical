@@ -1,15 +1,18 @@
-# Core dependencies
+# DeepSeek API (recommended - no GPU required)
+openai>=1.0.0
+
+# Core dependencies (only needed for local model mode)
 torch>=2.0.0
 transformers>=4.30.0
 
 # Data processing
 numpy>=1.24.0
 
-# For better performance (required for DeepSeek)
+# For better performance (only needed for local model mode)
 accelerate>=0.20.0
 sentencepiece>=0.1.99
 
-# For quantization (8-bit/4-bit loading to save VRAM)
+# For quantization (only needed for local model mode with GPU)
 bitsandbytes>=0.41.0
 
 # Development tools (optional)

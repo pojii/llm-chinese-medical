@@ -11,7 +11,7 @@ import json
 
 from hybrid_kg import HybridMedicalKG
 from ner_dataset import TCMNERDataset
-from deepseek_predictor import DeepSeekMedicinePredictor
+from deepseek_api_predictor import DeepSeekAPIPredictor
 from llm_predictor import MedicineLLMPredictor
 from metrics import MedicineEvaluationMetrics
 
@@ -29,8 +29,8 @@ class HybridMedicinePredictionComparison:
         kg_path: str = "../data/medical.json",
         drkg_path: str = None,
         ner_path: str = None,
-        use_mock: bool = True,
-        load_in_4bit: bool = False
+        use_api: bool = True,
+        model_name: str = "deepseek-chat"
     ):
         """
         Initialize comparison system.
@@ -39,8 +39,8 @@ class HybridMedicinePredictionComparison:
             kg_path: Path to Chinese medical KG
             drkg_path: Path to DRKG (None for sample data)
             ner_path: Path to NER dataset (None for sample data)
-            use_mock: Use mock predictor instead of real LLM
-            load_in_4bit: Use 4-bit quantization to save VRAM (~75% reduction)
+            use_api: Use DeepSeek API instead of local model (default: True)
+            model_name: Model name for API (default: "deepseek-chat")
         """
         print("=" * 80)
         print("Initializing Hybrid Medicine Prediction Comparison System")
@@ -57,20 +57,15 @@ class HybridMedicinePredictionComparison:
 
         # Initialize LLM Predictor
         print("\n[3/3] Initializing LLM Predictor...")
-        if use_mock:
-            # Force mock mode
+        if use_api:
+            # Use DeepSeek API
+            self.predictor = DeepSeekAPIPredictor(model=model_name)
+        else:
+            # Use local model (legacy)
             self.predictor = MedicineLLMPredictor(model_name="mock", device="cpu")
             # Set model to None to trigger mock mode
             self.predictor.model = None
             print("Using MOCK predictor for demonstration (accurate predictions)")
-        else:
-            # Use DeepSeek chat model (optimized for chat-based interaction)
-            self.predictor = DeepSeekMedicinePredictor(
-                device="cuda",
-                load_in_4bit=load_in_4bit
-            )
-            quant_msg = " with 4-bit quantization" if load_in_4bit else ""
-            print(f"Using DeepSeek-R1-Distill-Llama-8B with CUDA acceleration{quant_msg}")
 
         print("\n" + "=" * 80)
         print("System Initialization Complete!")
@@ -361,7 +356,8 @@ def main():
             kg_path='../data/medical.json',
             drkg_path=None,  # Use sample DRKG data
             ner_path=None,   # Use sample NER data
-            use_mock=False   # Use real LLM (DeepSeek-V2-Lite-Chat)
+            use_api=True,    # Use DeepSeek API
+            model_name='deepseek-chat'  # API model name
         )
 
         # Run comparison

@@ -27,13 +27,14 @@ llm-chinese-medical/
 │   └── medical.json               # Chinese Medical KG data (45MB)
 ├── src/
 │   ├── knowledge_graph.py         # Chinese Medical KG loader
-│   ├── hybrid_kg.py               # Hybrid KG (Chinese + DRKG) 🆕
+│   ├── hybrid_kg.py               # Hybrid KG (Chinese + DRKG)
 │   ├── ner_dataset.py             # TCM NER dataset handler
-│   ├── llm_predictor.py           # LLM-based predictor (base class)
-│   ├── deepseek_predictor.py      # DeepSeek-R1-Distill-Llama-8B predictor 🆕
+│   ├── deepseek_api_predictor.py  # DeepSeek API predictor ⭐ (recommended)
+│   ├── deepseek_predictor.py      # DeepSeek local model predictor (GPU)
+│   ├── llm_predictor.py           # Base LLM predictor class
 │   ├── metrics.py                 # Evaluation metrics (P/R/F1)
 │   ├── main_comparison.py         # 2-way comparison (No KG vs Single KG)
-│   └── main_comparison_hybrid.py  # 3-way comparison (includes Hybrid KG) 🆕
+│   └── main_comparison_hybrid.py  # 3-way comparison (includes Hybrid KG)
 ├── models/                         # Model cache (auto-created)
 ├── outputs/                        # Results output directory
 ├── test_metrics.py                # Metrics test suite
@@ -158,29 +159,37 @@ The TCM NER dataset uses BIO tagging format:
 
 ## Model Configuration
 
-### Recommended Model (Default)
-- **Name**: `deepseek-ai/DeepSeek-R1-Distill-Llama-8B`
-- **Type**: Distilled reasoning model optimized for medical domain
-- **Requirements**: CUDA-compatible GPU (recommended), ~8GB VRAM
-- **Inference**: ~0.1-0.5 seconds per prediction on GPU
+### Recommended: DeepSeek API ⭐ (No GPU Required)
+- **Type**: Cloud-based API service
+- **Requirements**: DeepSeek API key only (no GPU needed)
+- **Inference**: ~0.5-2 seconds per prediction
 - **Advantages**:
-  - Advanced reasoning capabilities with distilled knowledge
+  - No GPU or heavy dependencies required
+  - Advanced reasoning capabilities
   - Better understanding of Chinese medical terminology
-  - More accurate and focused predictions
-  - Proper handling of system/user prompt formatting
+  - Cost-effective for most use cases
+  - Automatic scaling and updates
+
+**Setup**:
+
+1. Get your DeepSeek API key from [https://platform.deepseek.com](https://platform.deepseek.com)
+
+2. Set the API key as environment variable:
+```bash
+export DEEPSEEK_API_KEY='your-api-key-here'
+```
+
+3. Install dependencies:
+```bash
+pip install openai numpy
+```
 
 **Usage**:
 ```python
-from deepseek_predictor import DeepSeekMedicinePredictor
+from deepseek_api_predictor import DeepSeekAPIPredictor
 
-# Option 1: Standard float16 (requires ~8GB VRAM)
-predictor = DeepSeekMedicinePredictor(device="cuda")
-
-# Option 2: 4-bit quantization (requires ~2GB VRAM, recommended for low VRAM GPUs)
-predictor = DeepSeekMedicinePredictor(device="cuda", load_in_4bit=True)
-
-# Option 3: 8-bit quantization (requires ~4GB VRAM)
-predictor = DeepSeekMedicinePredictor(device="cuda", load_in_8bit=True)
+# Initialize with API (reads DEEPSEEK_API_KEY from environment)
+predictor = DeepSeekAPIPredictor(model="deepseek-chat")
 
 # Predict without KG
 query = "患者症状: 头痛, 发热。请推荐合适的中药。"
@@ -191,68 +200,56 @@ kg_context = "感冒是由病毒引起的上呼吸道感染..."
 result = predictor.predict_with_kg(query, kg_context)
 ```
 
-### Memory Optimization
+**Running the comparison:**
+```bash
+# Set API key
+export DEEPSEEK_API_KEY='your-api-key-here'
 
-The system now supports several memory optimization techniques:
+# Run comparison
+cd src
+python main_comparison.py
+```
 
-**1. Float16 (Default for GPU)**
-- Uses half-precision floating point
-- ~50% memory reduction vs float32
-- Minimal accuracy loss
-- Automatically enabled when using CUDA
+### Alternative: Local Model (For Offline Use)
 
-**2. 4-bit Quantization** ⭐ **Recommended for low VRAM**
-- Uses 4-bit integer quantization
-- ~75% memory reduction
-- Suitable for GPUs with 2-4GB VRAM
-- Requires `bitsandbytes` library
+If you need to run without internet connection, you can use local models:
 
-**3. 8-bit Quantization**
-- Uses 8-bit integer quantization
-- ~50% memory reduction
-- Better accuracy than 4-bit
-- Suitable for GPUs with 4-6GB VRAM
+**Option 1: DeepSeek R1 Distill Llama 8B (GPU Required)**
+- **Name**: `deepseek-ai/DeepSeek-R1-Distill-Llama-8B`
+- **Requirements**: CUDA GPU with 2-8GB VRAM
+- **Advantages**: Best accuracy for local deployment
 
-**4. Device Mapping**
-- Automatically distributes model across available devices
-- Offloads to CPU when GPU memory is insufficient
-- Enabled by default with `device_map="auto"`
+```python
+from deepseek_predictor import DeepSeekMedicinePredictor
 
-**Memory Requirements:**
-| Configuration | VRAM Required | Accuracy | Speed |
-|--------------|---------------|----------|-------|
-| Float16 | ~8GB | Best | Fastest |
-| 8-bit | ~4GB | Good | Fast |
-| 4-bit | ~2GB | Acceptable | Moderate |
+# Standard (8GB VRAM)
+predictor = DeepSeekMedicinePredictor(device="cuda")
 
-### Alternative Models
+# 4-bit quantization (2GB VRAM)
+predictor = DeepSeekMedicinePredictor(device="cuda", load_in_4bit=True)
+```
 
-#### CPU-Compatible Model (Legacy)
+**Option 2: Chinese GPT-2 (CPU Compatible)**
 - **Name**: `uer/gpt2-chinese-cluecorpussmall`
-- **Type**: Chinese GPT-2 (small)
 - **Requirements**: ~500MB RAM, CPU-compatible
-- **Inference**: ~1-3 seconds per prediction on CPU
-- **Note**: May produce less accurate results than DeepSeek
+- **Note**: Lower accuracy than DeepSeek
 
 ```python
 from llm_predictor import MedicineLLMPredictor
 
-# Use CPU-compatible model
 predictor = MedicineLLMPredictor(
     model_name="uer/gpt2-chinese-cluecorpussmall",
     device="cpu"
 )
 ```
 
-#### Auto-Detection
-The system automatically detects DeepSeek models:
-
+**Switching between API and Local:**
 ```python
-# In main_comparison.py
-if "deepseek" in model_name.lower():
-    predictor = DeepSeekMedicinePredictor(device=device)
-else:
-    predictor = MedicineLLMPredictor(model_name=model_name, device=device)
+# In main_comparison.py config
+config = {
+    'use_api': True,  # Set to False for local model
+    'model_name': 'deepseek-chat'  # Or local model name
+}
 ```
 
 ## Results
