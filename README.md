@@ -1,11 +1,20 @@
-# LLM Chinese Medical - Medicine Prediction with Knowledge Graph
+# LLM Chinese Medical - Medicine Recommender System with Knowledge Graph
 
-A system for Traditional Chinese Medicine (TCM) recommendation using Large Language Models (LLM) with and without Knowledge Graph augmentation.
+A comprehensive medical recommender system using Large Language Models (LLM) with Knowledge Graph augmentation. Provides ranked drug/treatment recommendations with rigorous evaluation metrics.
 
 ## Overview
 
-This project demonstrates the effectiveness of integrating medical knowledge graphs with LLMs for medicine prediction. It compares two approaches:
+This project demonstrates the effectiveness of integrating medical knowledge graphs with LLMs for medicine recommendation. It provides two complementary systems:
 
+### 1. **Medicine Recommender System** (NEW) 🎯
+Generates ranked lists of drug/treatment recommendations with evaluation using:
+- **Precision@K** (K=5,10,20,50): Accuracy of top-K recommendations
+- **Recall@K**: Coverage of relevant drugs in top-K
+- **MAP@K** (Mean Average Precision): Overall recommendation quality
+- **MRR@K** (Mean Reciprocal Rank): Ranking effectiveness
+
+### 2. **Named Entity Recognition (NER) System** (Original)
+Extracts medical entities from clinical text:
 1. **LLM Only**: Direct prediction using a lightweight Chinese LLM
 2. **LLM + Knowledge Graph**: Enhanced prediction using medical knowledge graph context
 
@@ -26,15 +35,19 @@ llm-chinese-medical/
 ├── data/
 │   └── medical.json               # Chinese Medical KG data (45MB)
 ├── src/
-│   ├── knowledge_graph.py         # Chinese Medical KG loader
-│   ├── hybrid_kg.py               # Hybrid KG (Chinese + DRKG)
-│   ├── ner_dataset.py             # TCM NER dataset handler
-│   ├── deepseek_api_predictor.py  # DeepSeek API predictor ⭐ (recommended)
-│   ├── deepseek_predictor.py      # DeepSeek local model predictor (GPU)
-│   ├── llm_predictor.py           # Base LLM predictor class
-│   ├── metrics.py                 # Evaluation metrics (P/R/F1)
-│   ├── main_comparison.py         # 2-way comparison (No KG vs Single KG)
-│   └── main_comparison_hybrid.py  # 3-way comparison (includes Hybrid KG)
+│   ├── knowledge_graph.py          # Chinese Medical KG loader
+│   ├── hybrid_kg.py                # Hybrid KG (Chinese + DRKG)
+│   ├── ner_dataset.py              # TCM NER dataset handler
+│   ├── recommender_dataset.py      # Recommender dataset (symptom→drugs) 🆕
+│   ├── recommender_predictor.py    # Recommender API wrapper 🆕
+│   ├── recommender_metrics.py      # Recommender metrics (P@K, R@K, MAP, MRR) 🆕
+│   ├── deepseek_api_predictor.py   # DeepSeek API predictor ⭐ (recommended)
+│   ├── deepseek_predictor.py       # DeepSeek local model predictor (GPU)
+│   ├── llm_predictor.py            # Base LLM predictor class
+│   ├── metrics.py                  # NER evaluation metrics (P/R/F1)
+│   ├── main_recommender.py         # Recommender evaluation 🆕
+│   ├── main_comparison.py          # 2-way NER comparison (No KG vs Single KG)
+│   └── main_comparison_hybrid.py   # 3-way NER comparison (includes Hybrid KG)
 ├── models/                         # Model cache (auto-created)
 ├── outputs/                        # Results output directory
 ├── test_metrics.py                # Metrics test suite
@@ -80,7 +93,42 @@ The medical knowledge graph data is automatically included. The dataset is from:
 
 ### Quick Start
 
-Run the comparison experiment:
+#### Medicine Recommender System (Recommended) 🆕
+
+Run the recommender evaluation with ranking metrics:
+
+```bash
+# Set API key
+export DEEPSEEK_API_KEY='your-api-key-here'
+
+# Run recommender evaluation
+cd src
+python main_recommender.py
+```
+
+This will:
+1. Load the medical knowledge graph (15,250+ samples from medical.json)
+2. Initialize the recommender predictor
+3. Generate ranked drug recommendations for medical queries
+4. Evaluate using Precision@K, Recall@K, MAP@K, MRR@K (K=5,10,20,50)
+5. Compare with and without KG augmentation
+6. Save results to `outputs/recommender_results.json`
+
+**Configuration options in `main_recommender.py`:**
+```python
+config = {
+    'kg_path': '../data/medical.json',
+    'model': 'deepseek-chat',
+    'num_samples': 10,           # Number of test samples
+    'query_type': None,          # 'disease', 'symptom', or None for all
+    'min_drugs': 3,              # Minimum ground truth drugs
+    'max_recommendations': 50     # Max recommendations per query
+}
+```
+
+#### NER System (Original)
+
+Run the NER comparison experiment:
 
 ```bash
 cd src
@@ -90,11 +138,69 @@ python main_comparison.py
 This will:
 1. Load the medical knowledge graph
 2. Initialize the LLM predictor
-3. Run predictions on sample TCM cases
+3. Run entity extraction on TCM cases
 4. Compare results with and without KG augmentation
 5. Save results to `outputs/comparison_results.json`
 
-### Individual Components
+### Recommender System Components 🆕
+
+#### 1. Recommender Dataset
+
+```python
+from recommender_dataset import MedicalRecommenderDataset
+
+# Load dataset (extracts symptom→drugs and disease→drugs pairs)
+dataset = MedicalRecommenderDataset("../data/medical.json")
+print(f"Loaded {len(dataset)} samples")
+
+# Get a sample
+sample = dataset.get_sample(0)
+print(f"Query Type: {sample['query_type']}")  # 'disease' or 'symptom'
+print(f"Query: {sample['query']}")
+print(f"Ground Truth: {sample['ground_truth']}")
+
+# Format as LLM query
+query = dataset.format_query(sample)
+```
+
+#### 2. Recommender Predictor
+
+```python
+from recommender_predictor import MedicalRecommenderPredictor
+
+predictor = MedicalRecommenderPredictor(model="deepseek-chat")
+
+# Recommend without KG (returns ranked list)
+recommendations = predictor.recommend_without_kg(query, top_k=10)
+print(f"Top 10 drugs: {recommendations}")
+
+# Recommend with KG
+recommendations_kg = predictor.recommend_with_kg(query, kg_context, top_k=10)
+```
+
+#### 3. Recommender Metrics
+
+```python
+from recommender_metrics import RecommenderMetrics
+
+metrics = RecommenderMetrics()
+
+# Evaluate single prediction
+recommended = ["药A", "药B", "药C", "药D", "药E"]
+relevant = {"药A", "药B", "药F"}
+
+result = metrics.evaluate_single(recommended, relevant)
+print(f"Precision@5: {result[5]['precision']}")
+print(f"Recall@5: {result[5]['recall']}")
+print(f"MAP@5: {result[5]['map']}")
+print(f"MRR@5: {result[5]['mrr']}")
+
+# Accumulate over multiple samples
+metrics.update(recommended, relevant)
+aggregate = metrics.get_aggregate_metrics()
+```
+
+### NER System Components (Original)
 
 #### 1. Knowledge Graph
 
@@ -254,7 +360,102 @@ config = {
 
 ## Results
 
-The system outputs comparison results showing:
+### Recommender System Results 🆕
+
+The recommender system outputs comprehensive ranking metrics:
+
+```
+================================================================================
+Sample 1/10
+================================================================================
+
+Query Type: symptom
+Query: 患者出现以下症状：发热、咳嗽、咽痛、流鼻涕，请推荐适合的药物或治疗方法。
+Disease: 感冒
+Ground Truth (6 drugs): ['连花清瘟胶囊', '板蓝根颗粒', '银翘解毒片', ...]
+
+────────────────────────────────────────────────────────────────────────────────
+【Method 1】Recommendation WITHOUT Knowledge Graph
+────────────────────────────────────────────────────────────────────────────────
+Top 10 Recommendations: ['连花清瘟胶囊', '感冒清热颗粒', '板蓝根颗粒', ...]
+Inference Time: 1.23s
+
+────────────────────────────────────────────────────────────────────────────────
+【Method 2】Recommendation WITH Knowledge Graph
+────────────────────────────────────────────────────────────────────────────────
+Retrieved KG Context:
+疾病名称: 感冒
+症状: 发热、咳嗽、咽痛...
+推荐药物: 连花清瘟胶囊、板蓝根颗粒...
+
+Top 10 Recommendations: ['连花清瘟胶囊', '板蓝根颗粒', '银翘解毒片', ...]
+Inference Time: 1.45s
+
+────────────────────────────────────────────────────────────────────────────────
+📊 Sample Metrics
+────────────────────────────────────────────────────────────────────────────────
+
+Without KG:
+  P@5:   0.4000
+  R@5:   0.3333
+  MAP@5: 0.4667
+  MRR@5: 1.0000
+
+With KG:
+  P@5:   0.6000
+  R@5:   0.5000
+  MAP@5: 0.7333
+  MRR@5: 1.0000
+
+================================================================================
+📊 Aggregate Recommender Metrics
+================================================================================
+Total samples: 10
+
+【Method 1】WITHOUT Knowledge Graph
+────────────────────────────────────────────────────────────────────────────────
+
+Metric          @5           @10          @20          @50
+────────────────────────────────────────────────────────────────────────────────
+Precision       0.3800       0.2400       0.1450       0.0680
+Recall          0.3210       0.4560       0.5890       0.7120
+MAP             0.4123       0.4456       0.4678       0.4832
+MRR             0.7234       0.7234       0.7234       0.7234
+
+【Method 2】WITH Knowledge Graph
+────────────────────────────────────────────────────────────────────────────────
+
+Metric          @5           @10          @20          @50
+────────────────────────────────────────────────────────────────────────────────
+Precision       0.5200       0.3100       0.1850       0.0820
+Recall          0.4780       0.5940       0.7120       0.8340
+MAP             0.6234       0.6512       0.6734       0.6891
+MRR             0.8945       0.8945       0.8945       0.8945
+
+────────────────────────────────────────────────────────────────────────────────
+🎯 Performance Comparison
+────────────────────────────────────────────────────────────────────────────────
+
+Improvement from Knowledge Graph Enhancement:
+
+Metric          @5           @10          @20          @50
+────────────────────────────────────────────────────────────────────────────────
+Precision       +36.84%      +29.17%      +27.59%      +20.59%
+Recall          +48.91%      +30.26%      +20.88%      +17.13%
+MAP             +51.19%      +46.16%      +43.97%      +42.62%
+MRR             +23.65%      +23.65%      +23.65%      +23.65%
+```
+
+**Key Advantages of Recommender Metrics:**
+- **Precision@K**: Shows accuracy at different cut-offs (top-5, top-10, etc.)
+- **Recall@K**: Measures coverage of relevant drugs
+- **MAP@K**: Evaluates overall ranking quality
+- **MRR@K**: Assesses how quickly relevant items appear
+- **Real-world applicability**: Users can choose from top-K suggestions
+
+### NER System Results (Original)
+
+The NER system outputs comparison results showing:
 
 - Original text and extracted entities
 - Ground truth medicine labels
@@ -472,12 +673,15 @@ Contributions are welcome! Please feel free to submit issues or pull requests.
 
 ## Future Improvements
 
-- [ ] Add more sophisticated retrieval methods (e.g., vector search)
-- [ ] Implement evaluation metrics (precision, recall, F1)
+- [x] ~~Implement evaluation metrics (precision, recall, F1)~~ ✅
+- [x] ~~Add recommender system with ranking metrics (P@K, R@K, MAP, MRR)~~ ✅
+- [ ] Add vector search for better KG retrieval
 - [ ] Support for larger/better Chinese medical LLMs
 - [ ] Interactive web interface
-- [ ] Integration with more medical knowledge sources
+- [ ] Integration with more medical knowledge sources (e.g., TCM databases)
 - [ ] Fine-tuning on TCM-specific data
+- [ ] Personalized recommendations based on patient history
+- [ ] Multi-modal medical data integration (images, lab results)
 
 ## Contact
 
