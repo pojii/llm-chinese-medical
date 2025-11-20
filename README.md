@@ -173,8 +173,14 @@ The TCM NER dataset uses BIO tagging format:
 ```python
 from deepseek_predictor import DeepSeekMedicinePredictor
 
-# Initialize with CUDA (recommended)
+# Option 1: Standard float16 (requires ~8GB VRAM)
 predictor = DeepSeekMedicinePredictor(device="cuda")
+
+# Option 2: 4-bit quantization (requires ~2GB VRAM, recommended for low VRAM GPUs)
+predictor = DeepSeekMedicinePredictor(device="cuda", load_in_4bit=True)
+
+# Option 3: 8-bit quantization (requires ~4GB VRAM)
+predictor = DeepSeekMedicinePredictor(device="cuda", load_in_8bit=True)
 
 # Predict without KG
 query = "患者症状: 头痛, 发热。请推荐合适的中药。"
@@ -184,6 +190,40 @@ result = predictor.predict_without_kg(query)
 kg_context = "感冒是由病毒引起的上呼吸道感染..."
 result = predictor.predict_with_kg(query, kg_context)
 ```
+
+### Memory Optimization
+
+The system now supports several memory optimization techniques:
+
+**1. Float16 (Default for GPU)**
+- Uses half-precision floating point
+- ~50% memory reduction vs float32
+- Minimal accuracy loss
+- Automatically enabled when using CUDA
+
+**2. 4-bit Quantization** ⭐ **Recommended for low VRAM**
+- Uses 4-bit integer quantization
+- ~75% memory reduction
+- Suitable for GPUs with 2-4GB VRAM
+- Requires `bitsandbytes` library
+
+**3. 8-bit Quantization**
+- Uses 8-bit integer quantization
+- ~50% memory reduction
+- Better accuracy than 4-bit
+- Suitable for GPUs with 4-6GB VRAM
+
+**4. Device Mapping**
+- Automatically distributes model across available devices
+- Offloads to CPU when GPU memory is insufficient
+- Enabled by default with `device_map="auto"`
+
+**Memory Requirements:**
+| Configuration | VRAM Required | Accuracy | Speed |
+|--------------|---------------|----------|-------|
+| Float16 | ~8GB | Best | Fastest |
+| 8-bit | ~4GB | Good | Fast |
+| 4-bit | ~2GB | Acceptable | Moderate |
 
 ### Alternative Models
 

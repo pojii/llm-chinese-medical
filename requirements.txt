@@ -9,6 +9,9 @@ numpy>=1.24.0
 accelerate>=0.20.0
 sentencepiece>=0.1.99
 
+# For quantization (8-bit/4-bit loading to save VRAM)
+bitsandbytes>=0.41.0
+
 # Development tools (optional)
 # jupyter>=1.0.0
 # matplotlib>=3.7.0

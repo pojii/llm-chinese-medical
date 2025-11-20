@@ -30,7 +30,9 @@ class MedicineLLMPredictor:
         self,
         model_name: str = "uer/gpt2-chinese-cluecorpussmall",
         device: str = "cpu",
-        max_length: int = 256
+        max_length: int = 256,
+        load_in_8bit: bool = False,
+        load_in_4bit: bool = False
     ):
         """
         Initialize the LLM predictor.
@@ -39,13 +41,22 @@ class MedicineLLMPredictor:
             model_name: Hugging Face model name (default: Chinese GPT2 small)
             device: Device to run on ('cpu' or 'cuda')
             max_length: Maximum generation length
+            load_in_8bit: Load model in 8-bit quantization (saves ~50% VRAM)
+            load_in_4bit: Load model in 4-bit quantization (saves ~75% VRAM)
         """
         self.model_name = model_name
         self.device = device
         self.max_length = max_length
+        self.uses_device_map = False  # Flag to track if using device_map
+        self.load_in_8bit = load_in_8bit
+        self.load_in_4bit = load_in_4bit
 
         print(f"Loading model: {model_name}...")
         print(f"Device: {device}")
+        if load_in_8bit:
+            print("Using 8-bit quantization (saves ~50% VRAM)")
+        elif load_in_4bit:
+            print("Using 4-bit quantization (saves ~75% VRAM)")
 
         if not HAS_TORCH:
             print("Torch not available. Using mock predictor for demonstration...")
@@ -58,11 +69,38 @@ class MedicineLLMPredictor:
                 model_name,
                 trust_remote_code=True
             )
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model_name,
-                trust_remote_code=True,
-                torch_dtype=torch.float32  # Use float32 for CPU
-            ).to(device)
+
+            # Optimize for CUDA with lower memory usage
+            if device == "cuda" or device.startswith("cuda:"):
+                model_kwargs = {
+                    "trust_remote_code": True,
+                    "device_map": "auto",
+                    "low_cpu_mem_usage": True
+                }
+
+                # Add quantization if specified
+                if self.load_in_4bit:
+                    model_kwargs["load_in_4bit"] = True
+                    model_kwargs["torch_dtype"] = torch.float16
+                elif self.load_in_8bit:
+                    model_kwargs["load_in_8bit"] = True
+                    model_kwargs["torch_dtype"] = torch.float16
+                else:
+                    model_kwargs["torch_dtype"] = torch.float16
+
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    model_name,
+                    **model_kwargs
+                )
+                self.uses_device_map = True
+            else:
+                # CPU mode - use float32
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    model_name,
+                    trust_remote_code=True,
+                    torch_dtype=torch.float32  # Use float32 for CPU
+                ).to(device)
+                self.uses_device_map = False
 
             self.model.eval()
             print("Model loaded successfully!")
@@ -99,7 +137,10 @@ class MedicineLLMPredictor:
                 return_tensors="pt",
                 truncation=True,
                 max_length=512
-            ).to(self.device)
+            )
+            # Move to device (handle device_map="auto" case)
+            if not self.uses_device_map:
+                inputs = inputs.to(self.device)
 
             with torch.no_grad():
                 outputs = self.model.generate(
@@ -152,7 +193,10 @@ class MedicineLLMPredictor:
                 return_tensors="pt",
                 truncation=True,
                 max_length=512
-            ).to(self.device)
+            )
+            # Move to device (handle device_map="auto" case)
+            if not self.uses_device_map:
+                inputs = inputs.to(self.device)
 
             with torch.no_grad():
                 outputs = self.model.generate(

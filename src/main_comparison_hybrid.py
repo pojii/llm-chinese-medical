@@ -29,7 +29,8 @@ class HybridMedicinePredictionComparison:
         kg_path: str = "../data/medical.json",
         drkg_path: str = None,
         ner_path: str = None,
-        use_mock: bool = True
+        use_mock: bool = True,
+        load_in_4bit: bool = False
     ):
         """
         Initialize comparison system.
@@ -39,6 +40,7 @@ class HybridMedicinePredictionComparison:
             drkg_path: Path to DRKG (None for sample data)
             ner_path: Path to NER dataset (None for sample data)
             use_mock: Use mock predictor instead of real LLM
+            load_in_4bit: Use 4-bit quantization to save VRAM (~75% reduction)
         """
         print("=" * 80)
         print("Initializing Hybrid Medicine Prediction Comparison System")
@@ -63,8 +65,12 @@ class HybridMedicinePredictionComparison:
             print("Using MOCK predictor for demonstration (accurate predictions)")
         else:
             # Use DeepSeek chat model (optimized for chat-based interaction)
-            self.predictor = DeepSeekMedicinePredictor(device="cuda")
-            print("Using DeepSeek-R1-Distill-Llama-8B with CUDA acceleration")
+            self.predictor = DeepSeekMedicinePredictor(
+                device="cuda",
+                load_in_4bit=load_in_4bit
+            )
+            quant_msg = " with 4-bit quantization" if load_in_4bit else ""
+            print(f"Using DeepSeek-R1-Distill-Llama-8B with CUDA acceleration{quant_msg}")
 
         print("\n" + "=" * 80)
         print("System Initialization Complete!")

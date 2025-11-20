@@ -12,17 +12,21 @@ class DeepSeekMedicinePredictor(MedicineLLMPredictor):
     Uses proper chat formatting and optimized generation parameters.
     """
 
-    def __init__(self, device: str = "cuda"):
+    def __init__(self, device: str = "cuda", load_in_8bit: bool = False, load_in_4bit: bool = False):
         """
         Initialize DeepSeek predictor.
 
         Args:
             device: Device to run on ('cuda' recommended)
+            load_in_8bit: Load model in 8-bit quantization (saves ~50% VRAM)
+            load_in_4bit: Load model in 4-bit quantization (saves ~75% VRAM)
         """
         super().__init__(
             model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-8B",
             device=device,
-            max_length=512
+            max_length=512,
+            load_in_8bit=load_in_8bit,
+            load_in_4bit=load_in_4bit
         )
 
         # Set pad token if not set
@@ -71,7 +75,10 @@ class DeepSeekMedicinePredictor(MedicineLLMPredictor):
                 truncation=True,
                 max_length=512,
                 padding=True
-            ).to(self.device)
+            )
+            # Move to device (handle device_map="auto" case)
+            if not self.uses_device_map:
+                inputs = inputs.to(self.device)
 
             with torch.no_grad():
                 outputs = self.model.generate(
@@ -160,7 +167,10 @@ class DeepSeekMedicinePredictor(MedicineLLMPredictor):
                 truncation=True,
                 max_length=1024,  # Longer for KG context
                 padding=True
-            ).to(self.device)
+            )
+            # Move to device (handle device_map="auto" case)
+            if not self.uses_device_map:
+                inputs = inputs.to(self.device)
 
             with torch.no_grad():
                 outputs = self.model.generate(
