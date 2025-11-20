@@ -16,7 +16,7 @@ class PTMHerbDataset:
     Loads prescriptions.txt and extracts symptom-herb pairs.
     """
 
-    def __init__(self, prescriptions_path: str = "data/PTM/data/prescriptions.txt"):
+    def __init__(self, prescriptions_path: str = "../data/PTM/data/prescriptions.txt"):
         """
         Initialize dataset.
 
@@ -360,7 +360,7 @@ def main():
 
     # Configuration
     config = {
-        'prescriptions_path': 'data/PTM/data/prescriptions.txt',
+        'prescriptions_path': '../data/PTM/data/prescriptions.txt',
         'model': 'deepseek-chat',
         'num_samples': 20,  # Number of test samples
         'vocab_size': 200,  # Top N herbs to include in vocabulary
