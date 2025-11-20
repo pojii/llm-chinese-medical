@@ -1,20 +1,25 @@
 """
-TCM NER Dataset handler for BIO-formatted text.
+TCM NER Dataset handler for BIO-formatted text and CMeEE format.
 """
 from typing import List, Tuple, Dict
 import random
+import json
+import os
 
 
 class TCMNERDataset:
     """
     Handler for Traditional Chinese Medicine Named Entity Recognition Dataset.
 
-    Format: BIO tagging
+    Supports two formats:
+    1. BIO tagging format
+    2. CMeEE (Chinese Medical Entity Extraction) JSON format
+
     Labels:
-        - B-SYM, I-SYM: Symptoms
-        - B-CAU, I-CAU: Causes
-        - B-HER, I-HER: Herbs/Medicine
-        - B-PRE, I-PRE: Prescriptions
+        - B-SYM, I-SYM: Symptoms (临床表现)
+        - B-CAU, I-CAU: Causes (疾病)
+        - B-HER, I-HER: Herbs/Medicine (药物)
+        - B-PRE, I-PRE: Prescriptions (医疗程序)
         - B-EFF, I-EFF: Effects
         - O: Other
     """
@@ -33,23 +38,43 @@ class TCMNERDataset:
         'O': 'Other'
     }
 
+    # CHIP2020 entity type mapping to BIO labels
+    CHIP2020_TYPE_MAP = {
+        'dis': 'CAU',      # 疾病 Disease -> Cause
+        'sym': 'SYM',      # 症状 Symptom -> Symptom
+        'pro': 'PRE',      # 医疗程序 Procedure -> Prescription
+        'dru': 'HER',      # 药物 Drug -> Herb/Medicine
+        'bod': None,       # 身体部位 Body part -> ignore
+        'mic': None,       # 微生物 Microorganism -> ignore
+        'ite': None        # 仪器设备 Equipment -> ignore
+    }
+
     def __init__(self, data_path: str = None):
         """
         Initialize TCM NER dataset.
 
         Args:
-            data_path: Path to BIO-formatted dataset file
+            data_path: Path to dataset file (BIO, JSON, or CHIP2020 format)
         """
         self.data_path = data_path
         self.sentences = []
 
         if data_path:
-            self.load_data(data_path)
+            # Auto-detect format and load
+            if '|||' in open(data_path, 'r', encoding='utf-8').readline():
+                # CHIP2020 format
+                self.load_chip2020_data(data_path)
+            elif data_path.endswith('.json'):
+                # CMeEE JSON format
+                self.load_json_data(data_path)
+            else:
+                # BIO format
+                self.load_bio_data(data_path)
         else:
             # Generate sample data for demonstration
             self.generate_sample_data()
 
-    def load_data(self, path: str):
+    def load_bio_data(self, path: str):
         """
         Load BIO-formatted data from file.
 
@@ -88,6 +113,110 @@ class TCMNERDataset:
                     'chars': current_sentence,
                     'labels': current_labels
                 })
+
+    def load_chip2020_data(self, path: str):
+        """
+        Load CHIP2020 format data from text file.
+
+        CHIP2020 Format:
+        text|||start end entity_type|||start end entity_type|||...
+
+        Example:
+        深呼吸及咳嗽时疼痛加剧。|||0 10 sym|||
+        """
+        with open(path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+
+                # Split text and entities
+                parts = line.split('|||')
+                if len(parts) < 2:
+                    continue
+
+                text = parts[0]
+                entity_parts = parts[1:-1]  # Last part is empty after final |||
+
+                # Convert to BIO format
+                chars = list(text)
+                labels = ['O'] * len(chars)
+
+                for entity_part in entity_parts:
+                    entity_part = entity_part.strip()
+                    if not entity_part:
+                        continue
+
+                    parts = entity_part.split()
+                    if len(parts) != 3:
+                        continue
+
+                    start_idx = int(parts[0])
+                    end_idx = int(parts[1])
+                    entity_type_chip = parts[2]
+
+                    # Map CHIP2020 type to our label system
+                    entity_type = self.CHIP2020_TYPE_MAP.get(entity_type_chip)
+
+                    if entity_type and start_idx < len(labels):  # Skip ignored types
+                        # BIO tagging
+                        labels[start_idx] = f'B-{entity_type}'
+                        for i in range(start_idx + 1, min(end_idx, len(labels))):
+                            labels[i] = f'I-{entity_type}'
+
+                self.sentences.append({
+                    'text': text,
+                    'chars': chars,
+                    'labels': labels
+                })
+
+    def load_json_data(self, path: str):
+        """
+        Load CMeEE format data from JSON file.
+
+        CMeEE Format:
+        [
+          {
+            "text": "患者因反复发作的头痛、头晕来诊。",
+            "entities": [
+              {"start_idx": 3, "end_idx": 11, "type": "临床表现", "entity": "反复发作的头痛"},
+              ...
+            ]
+          },
+          ...
+        ]
+        """
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        for item in data:
+            text = item['text']
+            entities = item.get('entities', [])
+
+            # Convert to BIO format
+            chars = list(text)
+            labels = ['O'] * len(chars)
+
+            for entity in entities:
+                start_idx = entity['start_idx']
+                end_idx = entity['end_idx']
+                entity_type_cmee = entity['type']
+
+                # Map CMeEE type to our label system
+                entity_type = self.CMEE_TYPE_MAP.get(entity_type_cmee)
+
+                if entity_type:  # Skip ignored types
+                    # BIO tagging
+                    if start_idx < len(labels):
+                        labels[start_idx] = f'B-{entity_type}'
+                        for i in range(start_idx + 1, min(end_idx, len(labels))):
+                            labels[i] = f'I-{entity_type}'
+
+            self.sentences.append({
+                'text': text,
+                'chars': chars,
+                'labels': labels
+            })
 
     def generate_sample_data(self):
         """Generate sample TCM NER data for demonstration."""
@@ -253,10 +382,13 @@ class TCMNERDataset:
 
 
 if __name__ == "__main__":
-    # Test the dataset
-    dataset = TCMNERDataset()
+    # Test the dataset with both formats
+    print("=" * 80)
+    print("Testing TCM NER Dataset with sample data")
+    print("=" * 80)
 
-    print(f"Dataset size: {len(dataset)}")
+    dataset = TCMNERDataset()
+    print(f"\nDataset size: {len(dataset)}")
     print("\nSample sentences:")
 
     for i in range(min(3, len(dataset))):
@@ -271,3 +403,26 @@ if __name__ == "__main__":
                 print(f"  {entity_type}: {entity_list}")
 
         print(f"Query: {dataset.format_for_prediction(sample)}")
+
+    # Test CMeEE format if file exists
+    cmee_path = "../data/CMeEE_sample.json"
+    if os.path.exists(cmee_path):
+        print("\n" + "=" * 80)
+        print("Testing with CMeEE format data")
+        print("=" * 80)
+
+        cmee_dataset = TCMNERDataset(cmee_path)
+        print(f"\nCMeEE Dataset size: {len(cmee_dataset)}")
+
+        for i in range(min(3, len(cmee_dataset))):
+            sample = cmee_dataset.get_sample(i)
+            print(f"\nSample {i + 1}:")
+            print(f"Text: {sample['text']}")
+
+            entities = cmee_dataset.extract_entities(sample)
+            print("Entities:")
+            for entity_type, entity_list in entities.items():
+                if entity_list:
+                    print(f"  {entity_type}: {entity_list}")
+
+            print(f"Query: {cmee_dataset.format_for_prediction(sample)}")

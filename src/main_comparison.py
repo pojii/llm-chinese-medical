@@ -311,10 +311,10 @@ def main():
     # Configuration
     config = {
         'kg_path': '../data/medical.json',
-        'ner_path': None,  # Use sample data
+        'ner_path': '../data/CHIP2020_Entity/data/val_data.txt',  # Use CHIP2020 validation data
         'use_api': True,  # Use DeepSeek API (set to False for local model)
         'model_name': 'deepseek-chat',  # Model name for API
-        'num_samples': 5  # Test on 5 samples
+        'num_samples': 10  # Test on 10 samples
     }
 
     try:
