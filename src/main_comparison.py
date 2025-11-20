@@ -8,6 +8,7 @@ import json
 
 from knowledge_graph import MedicalKnowledgeGraph
 from ner_dataset import TCMNERDataset
+from deepseek_predictor import DeepSeekMedicinePredictor
 from llm_predictor import MedicineLLMPredictor
 from metrics import MedicineEvaluationMetrics
 
@@ -48,10 +49,14 @@ class MedicinePredictionComparison:
 
         # Initialize LLM Predictor
         print("\n[3/3] Initializing LLM Predictor...")
-        self.predictor = MedicineLLMPredictor(
-            model_name=model_name,
-            device=device
-        )
+        # Use DeepSeek predictor if DeepSeek model is specified
+        if "deepseek" in model_name.lower():
+            self.predictor = DeepSeekMedicinePredictor(device=device)
+        else:
+            self.predictor = MedicineLLMPredictor(
+                model_name=model_name,
+                device=device
+            )
 
         print("\n" + "=" * 80)
         print("System Initialization Complete!")
@@ -306,8 +311,8 @@ def main():
     config = {
         'kg_path': '../data/medical.json',
         'ner_path': None,  # Use sample data
-        'model_name': 'uer/gpt2-chinese-cluecorpussmall',
-        'device': 'cpu',
+        'model_name': 'deepseek-ai/DeepSeek-V2-Lite-Chat',
+        'device': 'cuda',  # Use GPU for better performance
         'num_samples': 5  # Test on 5 samples
     }
 

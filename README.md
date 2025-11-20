@@ -29,7 +29,8 @@ llm-chinese-medical/
 │   ├── knowledge_graph.py         # Chinese Medical KG loader
 │   ├── hybrid_kg.py               # Hybrid KG (Chinese + DRKG) 🆕
 │   ├── ner_dataset.py             # TCM NER dataset handler
-│   ├── llm_predictor.py           # LLM-based predictor
+│   ├── llm_predictor.py           # LLM-based predictor (base class)
+│   ├── deepseek_predictor.py      # DeepSeek-V2-Lite-Chat predictor 🆕
 │   ├── metrics.py                 # Evaluation metrics (P/R/F1)
 │   ├── main_comparison.py         # 2-way comparison (No KG vs Single KG)
 │   └── main_comparison_hybrid.py  # 3-way comparison (includes Hybrid KG) 🆕
@@ -157,22 +158,61 @@ The TCM NER dataset uses BIO tagging format:
 
 ## Model Configuration
 
-### Default Model
+### Recommended Model (Default)
+- **Name**: `deepseek-ai/DeepSeek-V2-Lite-Chat`
+- **Type**: Chat-optimized LLM for medical domain
+- **Requirements**: CUDA-compatible GPU (recommended), ~8GB VRAM
+- **Inference**: ~0.1-0.5 seconds per prediction on GPU
+- **Advantages**:
+  - Chat-based architecture optimized for conversational medical queries
+  - Better understanding of Chinese medical terminology
+  - More accurate and focused predictions
+  - Proper handling of system/user prompt formatting
+
+**Usage**:
+```python
+from deepseek_predictor import DeepSeekMedicinePredictor
+
+# Initialize with CUDA (recommended)
+predictor = DeepSeekMedicinePredictor(device="cuda")
+
+# Predict without KG
+query = "患者症状: 头痛, 发热。请推荐合适的中药。"
+result = predictor.predict_without_kg(query)
+
+# Predict with KG
+kg_context = "感冒是由病毒引起的上呼吸道感染..."
+result = predictor.predict_with_kg(query, kg_context)
+```
+
+### Alternative Models
+
+#### CPU-Compatible Model (Legacy)
 - **Name**: `uer/gpt2-chinese-cluecorpussmall`
 - **Type**: Chinese GPT-2 (small)
 - **Requirements**: ~500MB RAM, CPU-compatible
 - **Inference**: ~1-3 seconds per prediction on CPU
-
-### Alternative Models
-
-You can use other lightweight Chinese models:
+- **Note**: May produce less accurate results than DeepSeek
 
 ```python
-# Example: Using a different model
+from llm_predictor import MedicineLLMPredictor
+
+# Use CPU-compatible model
 predictor = MedicineLLMPredictor(
-    model_name="THUDM/chatglm-6b-int4",  # Quantized model
+    model_name="uer/gpt2-chinese-cluecorpussmall",
     device="cpu"
 )
+```
+
+#### Auto-Detection
+The system automatically detects DeepSeek models:
+
+```python
+# In main_comparison.py
+if "deepseek" in model_name.lower():
+    predictor = DeepSeekMedicinePredictor(device=device)
+else:
+    predictor = MedicineLLMPredictor(model_name=model_name, device=device)
 ```
 
 ## Results

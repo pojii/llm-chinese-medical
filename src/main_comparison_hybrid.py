@@ -11,6 +11,7 @@ import json
 
 from hybrid_kg import HybridMedicalKG
 from ner_dataset import TCMNERDataset
+from deepseek_predictor import DeepSeekMedicinePredictor
 from llm_predictor import MedicineLLMPredictor
 from metrics import MedicineEvaluationMetrics
 
@@ -52,7 +53,7 @@ class HybridMedicinePredictionComparison:
         self.dataset = TCMNERDataset(ner_path)
         print(f"Loaded {len(self.dataset)} samples")
 
-        # Initialize LLM Predictor (use mock for demonstration)
+        # Initialize LLM Predictor
         print("\n[3/3] Initializing LLM Predictor...")
         if use_mock:
             # Force mock mode
@@ -61,7 +62,9 @@ class HybridMedicinePredictionComparison:
             self.predictor.model = None
             print("Using MOCK predictor for demonstration (accurate predictions)")
         else:
-            self.predictor = MedicineLLMPredictor(device="cpu")
+            # Use DeepSeek chat model (optimized for chat-based interaction)
+            self.predictor = DeepSeekMedicinePredictor(device="cuda")
+            print("Using DeepSeek-V2-Lite-Chat with CUDA acceleration")
 
         print("\n" + "=" * 80)
         print("System Initialization Complete!")
@@ -352,7 +355,7 @@ def main():
             kg_path='../data/medical.json',
             drkg_path=None,  # Use sample DRKG data
             ner_path=None,   # Use sample NER data
-            use_mock=True    # Use mock predictor for accurate demonstrations
+            use_mock=False   # Use real LLM (DeepSeek-V2-Lite-Chat)
         )
 
         # Run comparison
