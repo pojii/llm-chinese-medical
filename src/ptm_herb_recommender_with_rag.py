@@ -15,19 +15,32 @@ class HerbKnowledgeRAG:
     """
     RAG system for herb knowledge retrieval.
     Creates embeddings for herb knowledge and retrieves relevant information.
+    Uses OpenAI Embeddings API (no local model required).
     """
 
-    def __init__(self, knowledge_path: str = "../data/herb-knowledge.csv"):
+    def __init__(
+        self,
+        knowledge_path: str = "../data/herb-knowledge.csv",
+        api_key: str = None
+    ):
         """
-        Initialize RAG system.
+        Initialize RAG system with OpenAI Embeddings API.
 
         Args:
             knowledge_path: Path to herb-knowledge.csv
+            api_key: OpenAI API key (for embeddings)
         """
+        from openai import OpenAI
+
         self.knowledge_path = knowledge_path
         self.knowledge_entries = []
         self.embeddings = None
-        self.embedding_model = None
+        self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
+
+        if not self.api_key:
+            raise ValueError("OpenAI API key required. Set OPENAI_API_KEY environment variable.")
+
+        self.client = OpenAI(api_key=self.api_key)
 
         self.load_knowledge()
         self.initialize_embeddings()
@@ -73,28 +86,36 @@ class HerbKnowledgeRAG:
         return '. '.join(parts)
 
     def initialize_embeddings(self):
-        """Initialize embedding model and create embeddings for all knowledge."""
-        try:
-            from sentence_transformers import SentenceTransformer
+        """Create embeddings for all knowledge using OpenAI API."""
+        print("Creating embeddings using OpenAI API...")
+        print(f"Processing {len(self.knowledge_entries)} herb knowledge entries...")
 
-            print("Initializing embedding model...")
-            # Use paraphrase-multilingual for Chinese support
-            self.embedding_model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+        knowledge_texts = [entry['knowledge_text'] for entry in self.knowledge_entries]
 
-            print("Creating embeddings for herb knowledge...")
-            knowledge_texts = [entry['knowledge_text'] for entry in self.knowledge_entries]
-            self.embeddings = self.embedding_model.encode(knowledge_texts, show_progress_bar=True)
+        # Create embeddings using OpenAI API
+        # text-embedding-3-small is cheaper and faster
+        embeddings_list = []
 
-            print(f"Created {len(self.embeddings)} embeddings")
+        # Process in batches to avoid rate limits
+        batch_size = 100
+        for i in range(0, len(knowledge_texts), batch_size):
+            batch = knowledge_texts[i:i + batch_size]
+            print(f"  Processing batch {i // batch_size + 1}/{(len(knowledge_texts) + batch_size - 1) // batch_size}...")
 
-        except ImportError:
-            print("Warning: sentence-transformers not installed. Using fallback similarity.")
-            self.embedding_model = None
-            self.embeddings = None
+            response = self.client.embeddings.create(
+                model="text-embedding-3-small",
+                input=batch
+            )
+
+            for item in response.data:
+                embeddings_list.append(item.embedding)
+
+        self.embeddings = np.array(embeddings_list)
+        print(f"✅ Created {len(self.embeddings)} embeddings using OpenAI API")
 
     def retrieve_relevant_knowledge(self, query: str, top_k: int = 10) -> List[Dict]:
         """
-        Retrieve top K most relevant herb knowledge entries.
+        Retrieve top K most relevant herb knowledge entries using OpenAI API.
 
         Args:
             query: Symptom description
@@ -103,12 +124,12 @@ class HerbKnowledgeRAG:
         Returns:
             List of most relevant knowledge entries
         """
-        if self.embedding_model is None or self.embeddings is None:
-            # Fallback: return first top_k entries
-            return self.knowledge_entries[:top_k]
-
-        # Encode query
-        query_embedding = self.embedding_model.encode([query])[0]
+        # Encode query using OpenAI API
+        response = self.client.embeddings.create(
+            model="text-embedding-3-small",
+            input=[query]
+        )
+        query_embedding = np.array(response.data[0].embedding)
 
         # Calculate cosine similarity
         similarities = np.dot(self.embeddings, query_embedding) / (
@@ -508,9 +529,21 @@ def main():
     ║         TCM Herb Recommendation with RAG Enhancement                      ║
     ║                    PTM Dataset - Symptom → Herbs                          ║
     ║              Knowledge-Augmented Generation from herb-knowledge.csv       ║
+    ║              Using OpenAI Embeddings API (No Local Model)                 ║
     ║                                                                            ║
     ╚════════════════════════════════════════════════════════════════════════════╝
     """)
+
+    # Check API keys
+    if not os.environ.get("DEEPSEEK_API_KEY"):
+        print("❌ Error: DEEPSEEK_API_KEY not set")
+        print("   Set it with: export DEEPSEEK_API_KEY='your-key'")
+        return
+
+    if not os.environ.get("OPENAI_API_KEY"):
+        print("❌ Error: OPENAI_API_KEY not set (required for embeddings)")
+        print("   Set it with: export OPENAI_API_KEY='your-key'")
+        return
 
     # Configuration
     config = {
@@ -526,14 +559,15 @@ def main():
     print("Configuration:")
     print(f"  Data path: {config['prescriptions_path']}")
     print(f"  Knowledge path: {config['knowledge_path']}")
-    print(f"  Model: {config['model']}")
+    print(f"  LLM Model: {config['model']} (DeepSeek API)")
+    print(f"  Embeddings: text-embedding-3-small (OpenAI API)")
     print(f"  Test samples: {config['num_samples']}")
     print(f"  Herb vocabulary size: {config['vocab_size']}")
     print(f"  RAG top-K: {config['rag_top_k']}")
 
     # Initialize RAG system
     print("\n" + "=" * 80)
-    print("Initializing RAG System")
+    print("Initializing RAG System with OpenAI Embeddings API")
     print("=" * 80)
     rag_system = HerbKnowledgeRAG(config['knowledge_path'])
 

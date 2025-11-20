@@ -56,10 +56,12 @@ Indication: Wind-cold exterior repletion syndrome, headache, cough, fever, asthm
 
 ### 2. Vector Embeddings
 
-**Model**: `paraphrase-multilingual-MiniLM-L12-v2`
+**Model**: OpenAI `text-embedding-3-small` (via API)
+- No local model download required
 - Supports Chinese and English
-- 384-dimensional embeddings
-- Fast inference
+- 1536-dimensional embeddings
+- Fast API-based inference
+- Cost: ~$0.02 per 1M tokens
 
 **Embedding Text** (per herb):
 ```
@@ -120,8 +122,9 @@ RAG system for herb knowledge retrieval.
 ```python
 from ptm_herb_recommender_with_rag import HerbKnowledgeRAG
 
-# Initialize
+# Initialize with OpenAI API (no local model)
 rag = HerbKnowledgeRAG("../data/herb-knowledge.csv")
+# Will use OPENAI_API_KEY from environment
 
 # Retrieve relevant knowledge
 symptoms = "头痛发热咳嗽"
@@ -130,13 +133,13 @@ knowledge = rag.retrieve_relevant_knowledge(symptoms, top_k=10)
 # Each entry contains:
 # - pinyin, english, attributes, meridians
 # - effect, indication, knowledge_text
-# - similarity (cosine similarity score)
+# - similarity (cosine similarity score from OpenAI embeddings)
 ```
 
 **Methods**:
 - `load_knowledge()`: Load CSV and parse herb entries
-- `initialize_embeddings()`: Create vector embeddings for all herbs
-- `retrieve_relevant_knowledge(query, top_k)`: Retrieve top K relevant entries
+- `initialize_embeddings()`: Create embeddings via OpenAI API (batched)
+- `retrieve_relevant_knowledge(query, top_k)`: Retrieve top K relevant entries using OpenAI embeddings
 
 ### 2. PTMHerbPredictorWithRAG
 
@@ -180,16 +183,21 @@ Same as baseline (see `PTM_RECOMMENDER_README.md`).
 ### Prerequisites
 
 ```bash
-# Install dependencies
-pip install openai numpy sentence-transformers
+# Install dependencies (NO local models required!)
+pip install openai numpy
 
-# Set API key
-export DEEPSEEK_API_KEY='your-api-key-here'
+# Set API keys
+export DEEPSEEK_API_KEY='your-deepseek-api-key'
+export OPENAI_API_KEY='your-openai-api-key'
 
 # Ensure data files exist
 ls ../data/PTM/data/prescriptions.txt
 ls ../data/herb-knowledge.csv
 ```
+
+**Required API Keys:**
+- **DEEPSEEK_API_KEY**: For LLM inference (herb recommendation)
+- **OPENAI_API_KEY**: For embeddings (knowledge retrieval)
 
 ### Run Evaluation
 
@@ -216,14 +224,17 @@ config = {
 
 ```
 ================================================================================
-Initializing RAG System
+Initializing RAG System with OpenAI Embeddings API
 ================================================================================
 Loading herb knowledge from: ../data/herb-knowledge.csv
 Loaded 337 herb knowledge entries
-Initializing embedding model...
-Creating embeddings for herb knowledge...
-Batches: 100%|████████████████████| 11/11 [00:02<00:00,  4.12it/s]
-Created 337 embeddings
+Creating embeddings using OpenAI API...
+Processing 337 herb knowledge entries...
+  Processing batch 1/4...
+  Processing batch 2/4...
+  Processing batch 3/4...
+  Processing batch 4/4...
+✅ Created 337 embeddings using OpenAI API
 
 ================================================================================
 Sample 1/20
@@ -447,33 +458,48 @@ herbs = rag.retrieve_herbs(symptoms, categories)
 
 ## Performance Tips
 
-### 1. Cache Embeddings
+### 1. Cache Embeddings (Recommended)
+
+Since embeddings cost money via API, cache them after first run:
 
 ```python
-# Save embeddings to disk (first run)
 import pickle
-with open('herb_embeddings.pkl', 'wb') as f:
-    pickle.dump(rag.embeddings, f)
+import os
 
-# Load embeddings (subsequent runs)
-with open('herb_embeddings.pkl', 'rb') as f:
-    rag.embeddings = pickle.load(f)
+# Save embeddings after initialization
+if not os.path.exists('cached_herb_embeddings.pkl'):
+    rag = HerbKnowledgeRAG("../data/herb-knowledge.csv")
+    with open('cached_herb_embeddings.pkl', 'wb') as f:
+        pickle.dump(rag.embeddings, f)
+else:
+    # Load from cache (saves API calls)
+    rag = HerbKnowledgeRAG.__new__(HerbKnowledgeRAG)
+    rag.load_knowledge()
+    with open('cached_herb_embeddings.pkl', 'rb') as f:
+        rag.embeddings = pickle.load(f)
 ```
 
-### 2. Batch Retrieval
+**Cost savings**:
+- First run: ~$0.02 for 337 herbs
+- Subsequent runs: $0 (use cached embeddings)
+- Only query embeddings cost money (~$0.000004 per query)
+
+### 2. Batch Processing
+
+Process multiple samples to optimize API usage:
 
 ```python
-# For multiple queries, batch encode
-queries = [sample['symptoms'] for sample in dataset.samples]
-query_embeddings = rag.embedding_model.encode(queries, batch_size=32)
+# Batch queries if possible (but query embeddings are already fast)
+# Main cost is in initial herb knowledge embeddings
 ```
 
-### 3. GPU Acceleration
+### 3. API Rate Limits
 
-```python
-# Use GPU for faster embedding
-model = SentenceTransformer('model-name', device='cuda')
-```
+OpenAI API has rate limits:
+- Free tier: 3 RPM (requests per minute)
+- Paid tier: 3,500 RPM
+
+Current implementation uses batching (100 herbs per request) to minimize API calls.
 
 ## Limitations
 
@@ -608,27 +634,34 @@ print(f"Recall@10 improvement: {improvement['recall@10']:.4f}")
 
 **Common Issues**:
 
-1. **sentence-transformers not installed**
+1. **OpenAI API key not set**
    ```bash
-   pip install sentence-transformers
+   export OPENAI_API_KEY='your-openai-api-key'
    ```
 
-2. **CUDA out of memory**
-   ```python
-   # Use CPU instead
-   model = SentenceTransformer('model-name', device='cpu')
+2. **API rate limit exceeded**
+   ```
+   Error: Rate limit exceeded
+   Solution: Wait a minute or upgrade to paid tier
+   Current: Batches 100 herbs per request (4 batches total)
    ```
 
-3. **Slow embedding**
+3. **High API cost**
    ```python
-   # Cache embeddings after first run
-   # Use smaller embedding model
-   # Reduce batch size
+   # Cache embeddings after first run (see Performance Tips)
+   # Embeddings cost: ~$0.02 for initial 337 herbs
+   # Per-query cost: ~$0.000004 (very cheap)
    ```
 
 4. **Low RAG improvement**
    ```python
    # Increase top-K to 15-20
-   # Try different embedding model
    # Check retrieved knowledge relevance
+   # Verify symptom descriptions are detailed enough
+   ```
+
+5. **Import Error**
+   ```bash
+   pip install openai numpy
+   # Note: sentence-transformers NOT required!
    ```
