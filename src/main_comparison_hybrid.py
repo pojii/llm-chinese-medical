@@ -64,7 +64,7 @@ class HybridMedicinePredictionComparison:
         else:
             # Use DeepSeek chat model (optimized for chat-based interaction)
             self.predictor = DeepSeekMedicinePredictor(device="cuda")
-            print("Using DeepSeek-V2-Lite-Chat with CUDA acceleration")
+            print("Using DeepSeek-R1-Distill-Llama-8B with CUDA acceleration")
 
         print("\n" + "=" * 80)
         print("System Initialization Complete!")

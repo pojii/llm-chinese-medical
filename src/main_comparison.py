@@ -311,7 +311,7 @@ def main():
     config = {
         'kg_path': '../data/medical.json',
         'ner_path': None,  # Use sample data
-        'model_name': 'deepseek-ai/DeepSeek-V2-Lite-Chat',
+        'model_name': 'deepseek-ai/DeepSeek-R1-Distill-Llama-8B',
         'device': 'cuda',  # Use GPU for better performance
         'num_samples': 5  # Test on 5 samples
     }

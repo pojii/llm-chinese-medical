@@ -30,7 +30,7 @@ llm-chinese-medical/
 │   ├── hybrid_kg.py               # Hybrid KG (Chinese + DRKG) 🆕
 │   ├── ner_dataset.py             # TCM NER dataset handler
 │   ├── llm_predictor.py           # LLM-based predictor (base class)
-│   ├── deepseek_predictor.py      # DeepSeek-V2-Lite-Chat predictor 🆕
+│   ├── deepseek_predictor.py      # DeepSeek-R1-Distill-Llama-8B predictor 🆕
 │   ├── metrics.py                 # Evaluation metrics (P/R/F1)
 │   ├── main_comparison.py         # 2-way comparison (No KG vs Single KG)
 │   └── main_comparison_hybrid.py  # 3-way comparison (includes Hybrid KG) 🆕
@@ -159,12 +159,12 @@ The TCM NER dataset uses BIO tagging format:
 ## Model Configuration
 
 ### Recommended Model (Default)
-- **Name**: `deepseek-ai/DeepSeek-V2-Lite-Chat`
-- **Type**: Chat-optimized LLM for medical domain
+- **Name**: `deepseek-ai/DeepSeek-R1-Distill-Llama-8B`
+- **Type**: Distilled reasoning model optimized for medical domain
 - **Requirements**: CUDA-compatible GPU (recommended), ~8GB VRAM
 - **Inference**: ~0.1-0.5 seconds per prediction on GPU
 - **Advantages**:
-  - Chat-based architecture optimized for conversational medical queries
+  - Advanced reasoning capabilities with distilled knowledge
   - Better understanding of Chinese medical terminology
   - More accurate and focused predictions
   - Proper handling of system/user prompt formatting

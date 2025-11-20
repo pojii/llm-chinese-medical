@@ -1,5 +1,5 @@
 """
-Improved LLM predictor specifically optimized for DeepSeek-V2-Lite-Chat.
+Improved LLM predictor specifically optimized for DeepSeek-R1-Distill-Llama-8B.
 """
 from llm_predictor import MedicineLLMPredictor, HAS_TORCH
 if HAS_TORCH:
@@ -8,7 +8,7 @@ if HAS_TORCH:
 
 class DeepSeekMedicinePredictor(MedicineLLMPredictor):
     """
-    Optimized predictor for DeepSeek-V2-Lite-Chat model.
+    Optimized predictor for DeepSeek-R1-Distill-Llama-8B model.
     Uses proper chat formatting and optimized generation parameters.
     """
 
@@ -20,7 +20,7 @@ class DeepSeekMedicinePredictor(MedicineLLMPredictor):
             device: Device to run on ('cuda' recommended)
         """
         super().__init__(
-            model_name="deepseek-ai/DeepSeek-V2-Lite-Chat",
+            model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-8B",
             device=device,
             max_length=512
         )
